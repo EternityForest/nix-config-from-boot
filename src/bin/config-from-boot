@@ -1,0 +1,54 @@
+#!/usr/bin/python3
+
+import glob
+import hashlib
+import os
+import shutil
+
+
+def compare(a,b):
+    "Must end with /** to work"
+    md5a = {}
+    md5b = {}
+
+    filenames = [i for i in glob.glob(a) if os.path.isfile(i)]
+
+    for filename in filenames:
+        with open(filename, 'rb') as inputfile:
+            data = inputfile.read()
+            md5a[filename[len(a)-2:]] = hashlib.md5(data).hexdigest()
+
+    filenames = [i for i in glob.glob(b) if os.path.isfile(i)]
+
+    for filename in filenames:
+        with open(filename, 'rb') as inputfile:
+            data = inputfile.read()
+            md5b[filename[len(b)-2:]] = hashlib.md5(data).hexdigest()
+
+    print(md5a, md5b, md5a==md5b)
+    return md5a == md5b
+
+rebuild = False
+
+if os.path.exists("/boot/nixcfg"):
+    if os.listdir("/boot/nixcfg"):
+        if not compare("/etc/nixos/config-from-boot/**", "/boot/nixcfg/**"):
+            b = glob.glob("/boot/nixcfg/**")
+            b = [i for i in b if os.path.isfile(i)]
+            a =glob.glob("/etc/nixos/config-from-boot/**")
+            a = [i for i in a if os.path.isfile(i)]
+
+            print(b,a)
+            for i in a:
+                os.remove(i)
+            for i in b:
+                shutil.copy(i, "/etc/nixos/config-from-boot/")
+
+            rebuild = True
+
+if rebuild:
+    pass
+    os.system("nixos-rebuild switch") 
+    os.system("rm -i $(cd /nix/var/nix/profiles; ls *-link -1dtr | head -n -3 | grep -v $(readlink system) | xargs realpath -s)")
+    os.system("nix-store --gc")
+    os.system("reboot now")
